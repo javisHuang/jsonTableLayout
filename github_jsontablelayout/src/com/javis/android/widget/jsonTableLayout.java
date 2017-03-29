@@ -17,17 +17,70 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.text.method.DigitsKeyListener;
 import android.util.AttributeSet;
+import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.TableLayout;
 import android.widget.TextView;
 import android.widget.EditText;;
 
 
 public class jsonTableLayout extends LinearLayout{
+	public static final String JSONType="type";
+	public static final String FieldWidth="width";
+	public static final String JSONEditText="JSONEditText";
+	public static final String JSONSelect="JSONSelect";
+	public enum EditTextType {
+		Number("Number"),
+		Text("Text");
+		private String text;
+		EditTextType(String text) {
+			this.text = text;
+		}
+		public String getText() {
+			return this.text;
+		}
+		public static EditTextType fromString(String text) {
+			if (text != null) {
+				for (EditTextType b : EditTextType.values()) {
+					if (text.equalsIgnoreCase(b.text)) {
+						return b;
+					}
+				}
+			}
+			return null;
+		}
+	}
+	public enum Type {
+		EditText("editText"),
+		Select("select");
+		private String text;
+		Type(String text) {
+			this.text = text;
+		}
+		public String getText() {
+			return this.text;
+		}
+		public static Type fromString(String text) {
+			if (text != null) {
+				for (Type b : Type.values()) {
+					if (text.equalsIgnoreCase(b.text)) {
+						return b;
+					}
+				}
+			}
+			return null;
+		}
+	}
 	private deleteOnTouchListener mdeleteOnTouchListener;
 	private OnTouchListener mOnTouchListener;
     private JSONArray data;
@@ -177,18 +230,115 @@ public class jsonTableLayout extends LinearLayout{
 				HashMap<String,String> h = columnDefs.get(i);
 				String field = h.get("field");
 				View view = null;
-				if("editText".equals(h.get("type"))){
+				if(Type.fromString(h.get(JSONType)) == Type.EditText){
+					if(!h.containsKey(JSONEditText)){
+						h.put(JSONEditText, EditTextType.Number.getText());
+					}
 					view = new EditText(getContext());
-					double xx = Double.parseDouble(rowData.getString(field));
-					((EditText) view).setText(Integer.toString((int) Math.floor(xx)));
-					textWatcher _textWatcher = new textWatcher();
-					_textWatcher.setObj(this);
-					_textWatcher.setJsonObj(rowData);
-					_textWatcher.setField(field);
-					_textWatcher.setPosition(j);
-					((EditText) view).addTextChangedListener(_textWatcher);
-					((EditText) view).setInputType(InputType.TYPE_CLASS_NUMBER);
-					((EditText) view).setKeyListener(DigitsKeyListener.getInstance("0123456789"));
+					((EditText) view).setSingleLine(true);
+					if(EditTextType.fromString(h.get(JSONEditText)) == EditTextType.Number){
+						double xx = Double.parseDouble(rowData.getString(field));
+						((EditText) view).setText(Integer.toString((int) Math.floor(xx)));
+						textWatcher _textWatcher = new textWatcher();
+						_textWatcher.setObj(this);
+						_textWatcher.setJsonObj(rowData);
+						_textWatcher.setField(field);
+						_textWatcher.setPosition(j);
+						((EditText) view).addTextChangedListener(_textWatcher);
+						((EditText) view).setInputType(InputType.TYPE_CLASS_NUMBER);
+						((EditText) view).setKeyListener(DigitsKeyListener.getInstance("0123456789"));
+					}
+					if(EditTextType.fromString(h.get(JSONEditText)) == EditTextType.Text){
+						((EditText) view).setText(rowData.getString(field));
+						textWatcher _textWatcher = new textWatcher();
+						_textWatcher.setObj(this);
+						_textWatcher.setJsonObj(rowData);
+						_textWatcher.setField(field);
+						_textWatcher.setPosition(j);
+						((EditText) view).addTextChangedListener(_textWatcher);
+					}
+
+					((EditText) view).setTextColor(bodyTextColor==-1?Color.parseColor("#000000"):bodyTextColor);
+					if(bodyTextSize!=-1){
+						((EditText) view).setTextSize(bodyTextSize);
+					}
+					view.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+					row.addView(view);
+				}else if(Type.fromString(h.get(JSONType)) == Type.Select){
+					class runnable implements Runnable{
+						private View view;
+						public int width;
+						protected Spinner sview;
+						public int height;
+						public runnable(View view, Spinner sview){
+							this.view = view;
+							this.sview = sview;
+						}
+						@Override
+						public void run() {
+				            this.width = view.getWidth();
+				            this.height = view.getHeight();
+				            run2();
+						}
+						
+						public void run2(){}
+					}
+					final JSONObject _rowData = rowData;
+					final String _field = field;
+					final int index = j;
+					view = new FrameLayout(getContext());
+					view.setLayoutParams(new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f));
+					row.addView(view);
+					Spinner sview = new Spinner(getContext());
+					Spinner spinner = (Spinner) sview;
+					String[] items = h.get(JSONSelect).toString().split(",");
+					SpinnerAdapter adapter = new SpinnerAdapter(getContext(), android.R.layout.simple_spinner_dropdown_item, items);
+					adapter.setBodyTextColor(bodyTextColor==-1?Color.parseColor("#000000"):bodyTextColor);
+					if(bodyTextSize!=-1){
+						adapter.setBodyTextSize(bodyTextSize);
+					}
+					spinner.setAdapter(adapter);
+					spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+						@Override
+						public void onItemSelected(AdapterView<?> parent,
+								View view, int position, long id) {
+				        	try {
+				        		_rowData.put(_field, ((TextView) view).getText());
+								data.put(index, _rowData);
+								setData(data);
+							} catch (JSONException e) {
+								e.printStackTrace();
+							}
+						}
+
+						@Override
+						public void onNothingSelected(AdapterView<?> parent) {
+						}
+					});
+					if(rowData.getString(field) != ""){
+					    int spinnerPosition = adapter.getPosition(rowData.getString(field));
+					    spinner.setSelection(spinnerPosition, true);
+					}else{
+						spinner.setSelection(0, true);
+					}
+					if(h.containsKey(FieldWidth)){
+						sview.setLayoutParams(new LinearLayout.LayoutParams(Integer.valueOf(h.get(FieldWidth)),
+								 LayoutParams.WRAP_CONTENT, 0));
+						((ViewGroup)view).addView(sview);
+					}else{
+						((ViewGroup)view).addView(sview);
+						view.post(new runnable(view,sview){
+							@Override
+							public void run2() {
+								if(this.width==0 || this.height==0){
+									return;
+								}
+								FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(this.width, this.height, 0);
+								lp.gravity = Gravity.CENTER;
+								this.sview.setLayoutParams(lp);
+							}
+						});
+					}
 				}else{
 					view = new TextView(getContext());
 					view.setPadding(5, 5, 5, 5);
@@ -197,9 +347,9 @@ public class jsonTableLayout extends LinearLayout{
 					if(bodyTextSize!=-1){
 						((TextView) view).setTextSize(bodyTextSize);
 					}
+					view.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+					row.addView(view);
 				}
-				view.setLayoutParams(new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-				row.addView(view);
 			}
 			if(mdeleteOnTouchListener != null){
 				ImageButton ib = new ImageButton(getContext());
@@ -315,4 +465,59 @@ public class jsonTableLayout extends LinearLayout{
     public void setBodyItemTouchDownColor(String color){
     	this.bodyItemTouchColor=Color.parseColor(color);
     }
+    
+	private class SpinnerAdapter extends ArrayAdapter<String> {
+		Context context;
+		String[] items = new String[] {};
+		private int bodyTextSize=30;
+		private int bodyTextColor=Color.BLUE;
+
+		public SpinnerAdapter(final Context context,
+				final int textViewResourceId, final String[] objects) {
+			super(context, textViewResourceId, objects);
+			this.items = objects;
+			this.context = context;
+		}
+
+		public void setBodyTextSize(int bodyTextSize) {
+			this.bodyTextSize = bodyTextSize;
+		}
+
+		public void setBodyTextColor(int bodyTextColor) {
+			this.bodyTextColor = bodyTextColor;
+		}
+
+		@Override
+		public View getDropDownView(int position, View convertView,
+				ViewGroup parent) {
+
+			if (convertView == null) {
+				LayoutInflater inflater = LayoutInflater.from(context);
+				convertView = inflater.inflate(
+						android.R.layout.simple_spinner_item, parent, false);
+			}
+			convertView.setBackgroundColor(Color.parseColor("#FFFFFF"));
+			TextView tv = (TextView) convertView
+					.findViewById(android.R.id.text1);
+			tv.setText(items[position]);
+			tv.setTextColor(bodyTextColor);
+			tv.setTextSize(bodyTextSize);
+			return convertView;
+		}
+
+		@Override
+		public View getView(int position, View convertView, ViewGroup parent) {
+			if (convertView == null) {
+				LayoutInflater inflater = LayoutInflater.from(context);
+				convertView = inflater.inflate(
+						android.R.layout.simple_spinner_item, parent, false);
+			}
+			TextView tv = (TextView) convertView
+					.findViewById(android.R.id.text1);
+			tv.setText(items[position]);
+			tv.setTextColor(bodyTextColor);
+			tv.setTextSize(bodyTextSize);
+			return convertView;
+		}
+	}
 }
